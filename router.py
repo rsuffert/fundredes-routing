@@ -11,7 +11,7 @@ PORT: int = 19_000
 # These are expressed IN SECONDS
 SEND_ROUTES_INTERVAL:         int = 15
 STALE_ROUTE_THRESHOLD:        int = 35
-SHOW_ROUTING_TABLE_INTERVAL:  int = 10
+SHOW_ROUTING_TABLE_INTERVAL:  int = 20
 
 ROUTING_TABLE_PATTERN: str = r'!(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+)'
 ROUTING_ANNOUNCEMENT_PATTERN: str = r'@(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'
