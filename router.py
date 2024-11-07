@@ -188,7 +188,7 @@ class Router:
         # Message is not for me - is it in the routing table?
         if dest_ip not in self.table:
             # No route to the destination
-            logging.info(f"No route to {dest_ip}")
+            logging.error(f"No route to {dest_ip}")
             return
         
         # Message is not for me - forward it
@@ -207,6 +207,27 @@ class Router:
                 del self.table[dest_ip]
                 self.table_mutex.release()
 
+    def _handle_outgoing_message(self) -> None:
+        """
+        Monitors the terminal for user input and sends plain text messages.
+        This should be called in a new thread; otherwise, it will block the caller.
+        """
+        while True:
+            msg:     str = input("Type the message you want to send: ")
+            dest_ip: str = input("Type the destination IP: ")
+
+            self.table_mutex.acquire()
+            if dest_ip not in self.table:
+                logging.error("No route to the destination.")
+                continue
+
+            next_hop: str = self.table[dest_ip].out_address
+            self.table_mutex.release()
+
+            self.sock_mutex.acquire()
+            self.sock.sendto(f"&{self.my_ip}%{dest_ip}%{msg}".encode(), (next_hop, PORT))
+            self.sock_mutex.release()
+
     def run(self) -> None:
         """
         Runs the router.
@@ -216,6 +237,7 @@ class Router:
         schedule.every(1).seconds.do(self._remove_stale_routes) # check for stale routes every second
         schedule.every(SHOW_ROUTING_TABLE_INTERVAL).seconds.do(self._show_routing_table)
         threading.Thread(target=self._handle_incoming_messages).start()
+        threading.Thread(target=self._handle_outgoing_message).start()
         while True:
             schedule.run_pending()
             time.sleep(1)
