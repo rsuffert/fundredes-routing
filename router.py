@@ -4,6 +4,7 @@ import time
 import socket
 import threading
 import re
+import logging
 
 NEIGHBORS_FILE: str = "roteadores.txt"
 PORT: int = 19_000
@@ -16,6 +17,11 @@ SHOW_ROUTING_TABLE_INTERVAL:  int = 20
 ROUTING_TABLE_PATTERN: str = r'!(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+)'
 ROUTING_ANNOUNCEMENT_PATTERN: str = r'@(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'
 PLAIN_TEXT_PATTERN: str = r'&(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})%(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})%(.+)'
+
+logging.basicConfig(filename='output.txt', 
+                    level=logging.INFO, 
+                    format='%(asctime)s - %(message)s',
+                    filemode='a')
 
 class Path:
     """
@@ -73,10 +79,10 @@ class Router:
         """
         Prints the routing table of the router instance in a formatted way.
         """
-        print(f"{'Destination IP':<20} {'Metric':<10} {'Output IP':<20}")
-        print("="*50)
+        logging.info(f"{'Destination IP':<20} {'Metric':<10} {'Output IP':<20}")
+        logging.info("="*50)
         for dest_ip, path in self.table.items():
-            print(f"{dest_ip:<20} {path.metric:<10} {path.out_address:<20}")
+            logging.info(f"{dest_ip:<20} {path.metric:<10} {path.out_address:<20}")
 
     def _send_routes(self) -> None:
         """
@@ -176,13 +182,13 @@ class Router:
         """
         if dest_ip == self.my_ip:
             # Message is for me
-            print(f"Message from {sender_ip}: '{text}'")
+            logging.info(f"Message from {sender_ip}: '{text}'")
             return
         
         # Message is not for me - is it in the routing table?
         if dest_ip not in self.table:
             # No route to the destination
-            print(f"No route to {dest_ip}")
+            logging.info(f"No route to {dest_ip}")
             return
         
         # Message is not for me - forward it
