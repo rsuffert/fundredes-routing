@@ -15,6 +15,7 @@ SHOW_ROUTING_TABLE_INTERVAL:  int = 10
 
 ROUTING_TABLE_PATTERN: str = r'!(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+)'
 ROUTING_ANNOUNCEMENT_PATTERN: str = r'@(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'
+PLAIN_TEXT_PATTERN: str = r'&(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})%(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})%(.+)'
 
 class Path:
     """
@@ -110,6 +111,7 @@ class Router:
         """
         table_regex = re.compile(ROUTING_TABLE_PATTERN)
         announce_regex = re.compile(ROUTING_ANNOUNCEMENT_PATTERN)
+        plain_text_regex = re.compile(PLAIN_TEXT_PATTERN)
 
         while True:
             self.sock_mutex.acquire()
@@ -129,7 +131,11 @@ class Router:
                 self.table_mutex.acquire()
                 self.table[message[1:]] = Path(message[1:], 1)
                 self.table_mutex.release()
-    
+            elif plain_text_regex.match(message): # if it's a plain text message
+                self.table_mutex.acquire()
+                matches = plain_text_regex.findall(message)[0]
+                self.table_mutex.release()
+            
     def _update_table(self, out_ip: str, entry: str) -> None:
         """
         Checks if the routing table already includes the given entry. If not, it is added. If it does, then it will be updated
@@ -159,6 +165,31 @@ class Router:
             self.table[route_ip].metric = metric
             self.table[route_ip].timestamp = time.time()
             self._send_routes()
+
+    def _handle_plain_text_message(self, sender_ip: str, dest_ip: str, text: str) -> None:
+        """
+        Handles a plain text message. If it is a message for this router, it will be printed. Otherwise, it will be forwarded.
+        Args:
+            sender_ip (str): The IP address of the sender of the message.
+            dest_ip (str): The IP address of the destination of the message.
+            text (str): The message to be sent.
+        """
+        if dest_ip == self.my_ip:
+            # Message is for me
+            print(f"Message from {sender_ip}: '{text}'")
+            return
+        
+        # Message is not for me - is it in the routing table?
+        if dest_ip not in self.table:
+            # No route to the destination
+            print(f"No route to {dest_ip}")
+            return
+        
+        # Message is not for me - forward it
+        next_hop: str = self.table[dest_ip].out_address
+        self.sock_mutex.acquire()
+        self.sock.sendto(text.encode(), (next_hop, PORT))
+        self.sock_mutex.release()
 
     def _remove_stale_routes(self) -> None:
         """
