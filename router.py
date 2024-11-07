@@ -3,6 +3,7 @@ import schedule
 import time
 import socket
 import threading
+import re
 
 NEIGHBORS_FILE: str = "roteadores.txt"
 PORT: int = 19_000
@@ -11,6 +12,9 @@ PORT: int = 19_000
 SEND_ROUTES_INTERVAL:         int = 15
 STALE_ROUTE_THRESHOLD:        int = 35
 SHOW_ROUTING_TABLE_INTERVAL:  int = 10
+
+ROUTING_TABLE_PATTERN: str = r'!(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+)'
+ROUTING_ANNOUNCEMENT_PATTERN: str = r'@(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'
 
 class Path:
     """
@@ -104,8 +108,57 @@ class Router:
         Monitors the router's socket for incoming messages and handles them.
         This should be called in a new thread; otherwise, it will block the caller.
         """
-        # TODO: implement this
-        pass
+        table_regex = re.compile(ROUTING_TABLE_PATTERN)
+        announce_regex = re.compile(ROUTING_ANNOUNCEMENT_PATTERN)
+
+        while True:
+            self.sock_mutex.acquire()
+            data, addr = self.sock.recvfrom(1024)
+            self.sock_mutex.release()
+            
+            sender_ip: str = addr[0]
+            message = data.decode()
+
+            if table_regex.match(message): # if it's a routing table
+                for entry in table_regex.findall(message):
+                    self.table_mutex.acquire()
+                    self._update_table(sender_ip, entry)
+                    self.table_mutex.release()
+            elif announce_regex.match(message): # if it's a router entry announcement
+                # Add the neighbor to the routing table
+                self.table_mutex.acquire()
+                self.table[message[1:]] = Path(message[1:], 1)
+                self.table_mutex.release()
+    
+    def _update_table(self, out_ip: str, entry: str) -> None:
+        """
+        Checks if the routing table already includes the given entry. If not, it is added. If it does, then it will be updated
+        if the new metric is lower than the current one.
+        Args:
+            sender_ip (str): The IP address of the sender of the routing table.
+            entry (str): The entry to be added or updated in the routing table. It should be in the format '192.168.10.1:1'.
+        """
+        if out_ip == self.my_ip:
+            # Ignore routes to myself
+            return
+
+        data: List[str] = entry.split(":")
+        route_ip: str = data[0]
+        metric: int = int(data[1])
+
+        if route_ip not in self.table:
+            # Add entry
+            self.table[route_ip] = Path(out_ip, metric)
+            self._send_routes()
+            return
+        
+        # Update existing entry
+        # When the metric is the same, favor updating the entry so
+        # the timestamp is reset and the route is not considered stale
+        if metric <= self.table[route_ip].metric:
+            self.table[route_ip].metric = metric
+            self.table[route_ip].timestamp = time.time()
+            self._send_routes()
 
     def _remove_stale_routes(self) -> None:
         """
