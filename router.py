@@ -165,11 +165,13 @@ class Router:
                 self.table_mutex.acquire()
                 self._handle_plain_text_message(matches[0], matches[1], matches[2])
                 self.table_mutex.release()
+            else:
+                logging.debug(f"Discarding unrecognized message from {sender_ip}: {message}")
             
     def _update_table(self, out_ip: str, entry: str) -> None:
         """
         Checks if the routing table already includes the given entry. If not, it is added. If it does, then it will be updated
-        if the new metric is lower than the current one.
+        if the new metric is lower than or equal to the current one.
         Args:
             sender_ip (str): The IP address of the sender of the routing table.
             entry (str): The entry to be added or updated in the routing table. It should be in the format '192.168.10.1:1'.
