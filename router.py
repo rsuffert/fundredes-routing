@@ -33,7 +33,8 @@ args = parser.parse_args()
 logging.basicConfig(
     filename='output.txt',
     level=logging.DEBUG if args.verbose else logging.INFO,
-    format='%(asctime)s - %(message)s',
+    format='%(levelname)s - %(asctime)s (at %(funcName)s:%(lineno)d): %(message)s\n',
+    datefmt='%H:%M:%S',
     filemode='a'
 )
 
@@ -57,12 +58,12 @@ class Router:
         """
         Initializes the router.
         """
-        logging.debug("__init__: Loading neighbors and my IP...")
+        logging.debug("Loading neighbors and my IP...")
         my_ip, neighbors = self._load_neighbors()
         self.neighbors: List[str] = neighbors
         self.my_ip: str = my_ip
 
-        logging.debug("__init__: Building initial routing table...")
+        logging.debug("Building initial routing table...")
         self.table: Dict[str, Path] = {}
         self.table_mutex = threading.Lock()
         for neighbor in self.neighbors:
@@ -70,7 +71,7 @@ class Router:
             self.table[neighbor] = Path(neighbor, 1)
             self.table_mutex.release()
         
-        logging.debug("__init__: Creating UDP socket...")
+        logging.debug("Creating UDP socket...")
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind((self.my_ip, PORT))
         self.sock_mutex = threading.Lock()
@@ -92,10 +93,12 @@ class Router:
         """
         Prints the routing table of the router instance in a formatted way.
         """
-        logging.info(f"{'Destination IP':<20} {'Metric':<10} {'Output IP':<20}")
-        logging.info("="*50)
+        table: str = f"{'Destination IP':<20} {'Metric':<10} {'Output IP':<20}\n"
+        table += f"{'='*50}\n"
         for dest_ip, path in self.table.items():
-            logging.info(f"{dest_ip:<20} {path.metric:<10} {path.out_address:<20}")
+            table += f"{dest_ip:<20} {path.metric:<10} {path.out_address:<20}\n"
+        table = table.strip('\n')
+        logging.info(f"Routing table:\n{table}")
 
     def _send_routes(self) -> None:
         """
@@ -107,7 +110,7 @@ class Router:
             message += f"!{path.out_address}:{path.metric}"
         encoded_message: bytes = message.encode()
         
-        logging.debug(f"_send_routes: Sending routing table to neighbors: {message}")
+        logging.debug(f"Sending routing table to neighbors: {message}")
 
         # send it to all neighbors
         for neighbor in self.neighbors:
@@ -119,7 +122,7 @@ class Router:
         """
         Announces to the neighbors that this router has entered the network.
         """
-        logging.debug(f"_announce_entry: Announcing entry to neighbors: {self.neighbors}")
+        logging.debug(f"Announcing entry to neighbors: {self.neighbors}")
 
         encoded_message: bytes = f"@{self.my_ip}".encode()
         for neighbor in self.neighbors:
@@ -145,19 +148,19 @@ class Router:
             message:   str = data.decode()
 
             if table_regex.match(message):
-                logging.debug(f"_handle_incoming_messages: Received routing table from {sender_ip}: {message}")
+                logging.debug(f"Received routing table from {sender_ip}: {message}")
                 for entry in table_regex.findall(message):
                     self.table_mutex.acquire()
                     self._update_table(sender_ip, entry)
                     self.table_mutex.release()
             elif announce_regex.match(message):
-                logging.debug(f"_handle_incoming_messages: Received entry announcement from {sender_ip}: {message}")
+                logging.debug(f"Received entry announcement from {sender_ip}: {message}")
                 # Add the neighbor to the routing table
                 self.table_mutex.acquire()
                 self.table[message[1:]] = Path(message[1:], 1)
                 self.table_mutex.release()
             elif plain_text_regex.match(message):
-                logging.debug(f"_handle_incoming_messages: Received plain text message from {sender_ip}")
+                logging.debug(f"Received plain text message from {sender_ip}")
                 matches = plain_text_regex.findall(message)[0]
                 self.table_mutex.acquire()
                 self._handle_plain_text_message(matches[0], matches[1], matches[2])
@@ -171,10 +174,10 @@ class Router:
             sender_ip (str): The IP address of the sender of the routing table.
             entry (str): The entry to be added or updated in the routing table. It should be in the format '192.168.10.1:1'.
         """
-        logging.debug(f"_update_table: Updating (or not) routing table with entry: {entry}")
+        logging.debug(f"Updating (or not) routing table with entry: {entry}")
 
         if out_ip == self.my_ip:
-            logging.debug(f"_update_table: Ignoring route to myself")
+            logging.debug("Ignoring route to myself")
             return
 
         data: List[str] = entry.split(":")
@@ -182,7 +185,7 @@ class Router:
         metric: int = int(data[1])
 
         if route_ip not in self.table:
-            logging.debug(f"_update_table: Adding new entry to routing table")
+            logging.debug("Adding new entry to routing table")
             self.table[route_ip] = Path(out_ip, metric)
             self._send_routes() # need to send the routing table whenever it changes
             return
@@ -191,7 +194,7 @@ class Router:
         # When the new metric is the same as the old one, favor updating the entry so
         # the timestamp is reset and the route is not considered stale
         if metric <= self.table[route_ip].metric:
-            logging.debug(f"_update_table: Updating existing entry in routing table")
+            logging.debug("Updating existing entry in routing table")
             self.table[route_ip].metric = metric
             self.table[route_ip].timestamp = time.time()
             self._send_routes() # need to send the routing table whenever it changes
@@ -216,7 +219,7 @@ class Router:
             return
         
         # Message is not for me - forward it
-        logging.debug(f"_handle_plain_text_message: forwarding message from {sender_ip} to {dest_ip}")
+        logging.debug(f"Forwarding message from {sender_ip} to {dest_ip}")
         next_hop: str = self.table[dest_ip].out_address
         self.sock_mutex.acquire()
         self.sock.sendto(text.encode(), (next_hop, PORT))
@@ -228,7 +231,7 @@ class Router:
         """
         for dest_ip, path in self.table.items():
             if time.time() - path.timestamp > STALE_ROUTE_THRESHOLD:
-                logging.debug(f"_remove_stale_routes: Removing stale route to {dest_ip}")
+                logging.debug(f"Removing stale route to {dest_ip}")
                 self.table_mutex.acquire()
                 del self.table[dest_ip]
                 self.table_mutex.release()
@@ -247,7 +250,7 @@ class Router:
                 logging.error(f"No route to {dest_ip}. Giving up...")
                 continue
             
-            logging.debug(f"_handle_outgoing_message: sending message to {dest_ip}: {msg}")
+            logging.debug(f"Sending message to {dest_ip}: {msg}")
 
             next_hop: str = self.table[dest_ip].out_address
             self.table_mutex.release()
