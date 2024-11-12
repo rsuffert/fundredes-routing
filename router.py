@@ -91,7 +91,7 @@ class Router:
         # parse the routing table into the required format
         message: str = ""
         for dest_ip, path in self.table.items():
-            message += f"!{path.out_address}:{path.metric}"
+            message += f"!{dest_ip}:{path.metric}"
         encoded_message: bytes = message.encode()
         
         logging.debug(f"Sending routing table to neighbors: {message}")
