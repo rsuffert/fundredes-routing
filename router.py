@@ -7,6 +7,8 @@ import re
 import logging
 import argparse
 
+# Configurations
+OUTPUT_FILE:    str = "output.txt"
 NEIGHBORS_FILE: str = "roteadores.txt"
 PORT:           int = 19_000
 
@@ -19,24 +21,6 @@ SHOW_ROUTING_TABLE_INTERVAL:  int = 20
 ROUTING_TABLE_PATTERN:        str = r'!(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+)'
 ROUTING_ANNOUNCEMENT_PATTERN: str = r'@(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'
 PLAIN_TEXT_PATTERN:           str = r'&(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})%(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})%(.+)'
-
-# Parse command line arguments
-parser = argparse.ArgumentParser(description='Router application')
-parser.add_argument(
-    '-v',
-    '--verbose',
-    action='store_true',
-    help='Enable verbose logging'
-)
-args = parser.parse_args()
-
-logging.basicConfig(
-    filename='output.txt',
-    level=logging.DEBUG if args.verbose else logging.INFO,
-    format='%(levelname)s - %(asctime)s (at %(funcName)s:%(lineno)d): %(message)s\n',
-    datefmt='%H:%M:%S',
-    filemode='a'
-)
 
 class Path:
     """
@@ -274,3 +258,26 @@ class Router:
         while True:
             schedule.run_pending()
             time.sleep(1)
+
+if __name__ == "__main__":
+    # parse command line arguments
+    parser = argparse.ArgumentParser(description='Router application')
+    parser.add_argument(
+        '-v',
+        '--verbose',
+        action='store_true',
+        help='Enable verbose logging'
+    )
+    args = parser.parse_args()
+
+    # set up logging
+    logging.basicConfig(
+        filename=OUTPUT_FILE,
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format='%(levelname)s - %(asctime)s (at %(funcName)s:%(lineno)d): %(message)s\n',
+        datefmt='%H:%M:%S',
+        filemode='a'
+    )
+
+    # start the router
+    Router().run()
