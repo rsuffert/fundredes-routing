@@ -161,8 +161,12 @@ class Router:
         route_ip: str = data[0]
         metric: int = int(data[1])
 
-        if route_ip == self.my_ip:
+        if route_ip == self.my_ip: # TODO: should we discard the route in this situation?
             logging.debug("Ignoring route to myself")
+            return
+        
+        if out_ip == self.my_ip: # TODO: should we discard the route in this situation?
+            logging.debug("Ignoring route whose next hop is myself")
             return
 
         if route_ip not in self.table:
@@ -176,8 +180,7 @@ class Router:
         # the timestamp is reset and the route is not considered stale
         if metric <= self.table[route_ip].metric:
             logging.debug("Updating existing entry in routing table")
-            self.table[route_ip].metric = metric
-            self.table[route_ip].timestamp = time.time()
+            self.table[route_ip] = Path(out_ip, metric)
             self._send_routes() # need to send the routing table whenever it changes
 
     def _handle_plain_text_message(self, sender_ip: str, dest_ip: str, text: str) -> None:
