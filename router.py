@@ -135,9 +135,9 @@ class Router:
                         self._update_table(sender_ip, entry)
             elif announce_regex.match(message):
                 logging.debug(f"Received entry announcement from {sender_ip}: {message}")
-                # Add the neighbor to the routing table
                 with self.table_mutex:
-                    self.table[message[1:]] = Path(message[1:], 1)
+                    self.table[message[1:]] = Path(message[1:], 1) # add the neighbor to the routing table
+                    self._send_routes() # need to send the routing table whenever it changes
             elif plain_text_regex.match(message):
                 logging.debug(f"Received plain text message from {sender_ip}")
                 matches = plain_text_regex.findall(message)[0]
