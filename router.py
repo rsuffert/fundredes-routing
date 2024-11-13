@@ -264,6 +264,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # set up logging
+    open(OUTPUT_FILE, 'w').close() # clear the output file
     logging.basicConfig(
         filename=OUTPUT_FILE,
         level=logging.DEBUG if args.verbose else logging.INFO,
