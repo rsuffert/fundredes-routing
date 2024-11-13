@@ -154,7 +154,7 @@ class Router:
             elif len(message) == 0:
                 # TODO: are empty routing tables allowed to be sent (they're a "heartbeat")
                 # and are they represented as empty strings?
-                logging.warn(f"Received empty message from {sender_ip} (possibly an empty routing table)")
+                logging.warning(f"Received empty message from {sender_ip} (possibly an empty routing table)")
             else:
                 logging.debug(f"Discarding unrecognized message from {sender_ip}: {message}")
             
@@ -264,6 +264,7 @@ class Router:
         def send_routes_with_mutex_wrapper():
             with self.table_mutex: self._send_routes()
         self._announce_entry()
+        schedule.logger.setLevel(logging.ERROR)
         schedule.every(SEND_ROUTES_INTERVAL).seconds.do(send_routes_with_mutex_wrapper)
         schedule.every(1).seconds.do(self._remove_stale_routes) # check for stale routes every second
         schedule.every(SHOW_ROUTING_TABLE_INTERVAL).seconds.do(self._show_routing_table)
