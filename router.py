@@ -78,14 +78,16 @@ class Router:
         """
         table: str = f"{'Destination IP':<20} {'Metric':<10} {'Output IP':<20}\n"
         table += f"{'='*50}\n"
-        for dest_ip, path in self.table.items():
-            table += f"{dest_ip:<20} {path.metric:<10} {path.out_address:<20}\n"
+        with self.table_mutex:
+            for dest_ip, path in self.table.items():
+                table += f"{dest_ip:<20} {path.metric:<10} {path.out_address:<20}\n"
         table = table.strip('\n')
         logging.info(f"Routing table:\n{table}")
 
     def _send_routes(self) -> None:
         """
-        Sends the routing table to all neighbors.
+        Sends the routing table to all neighbors. This is NOT thread-safe on the access to the routing table and, thus, it should
+        be handled by the caller!
         """
         # parse the routing table into the required format
         message: str = ""
@@ -148,6 +150,7 @@ class Router:
         """
         Checks if the routing table already includes the given entry. If not, it is added. If it does, then it will be updated
         if the new metric is lower than or equal to the current one.
+        This is NOT thread-safe on the access to the routing table and, thus, it should be handled by the caller!
         Args:
             sender_ip (str): The IP address of the sender of the routing table.
             entry (str): The entry to be added or updated in the routing table. It should be in the format '192.168.10.1:1'.
@@ -180,6 +183,7 @@ class Router:
     def _handle_plain_text_message(self, sender_ip: str, dest_ip: str, text: str) -> None:
         """
         Handles a plain text message. If it is a message for this router, it will be printed. Otherwise, it will be forwarded.
+        This is NOT thread-safe on the access to the routing table and, thus it should be handled by the caller!
         Args:
             sender_ip (str): The IP address of the sender of the message.
             dest_ip (str): The IP address of the destination of the message.
@@ -242,8 +246,10 @@ class Router:
         """
         Runs the router.
         """
+        def send_routes_with_mutex_wrapper():
+            with self.table_mutex: self._send_routes()
         self._announce_entry()
-        schedule.every(SEND_ROUTES_INTERVAL).seconds.do(self._send_routes)
+        schedule.every(SEND_ROUTES_INTERVAL).seconds.do(send_routes_with_mutex_wrapper)
         schedule.every(1).seconds.do(self._remove_stale_routes) # check for stale routes every second
         schedule.every(SHOW_ROUTING_TABLE_INTERVAL).seconds.do(self._show_routing_table)
         threading.Thread(target=self._handle_incoming_messages).start()
