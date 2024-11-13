@@ -151,6 +151,10 @@ class Router:
                 matches = plain_text_regex.findall(message)[0]
                 with self.table_mutex:
                     self._handle_plain_text_message(matches[0], matches[1], matches[2])
+            elif len(message) == 0:
+                # TODO: are empty routing tables allowed to be sent (they're a "heartbeat")
+                # and are they represented as empty strings?
+                logging.warn(f"Received empty message from {sender_ip} (possibly an empty routing table)")
             else:
                 logging.debug(f"Discarding unrecognized message from {sender_ip}: {message}")
             
