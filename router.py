@@ -128,6 +128,14 @@ class Router:
             sender_ip: str = addr[0]
             message:   str = data.decode()
 
+            # every time we get a message from a neighbor, doesn't matter what it is, we consider it
+            # as a "heartbeat" and update their timestamp (if they're already in the table) so they're
+            # not considered stale
+            # TODO: is this correct behavior?
+            with self.table_mutex:
+                if sender_ip in self.table:
+                    self.table[sender_ip].timestamp = time.time()
+
             if table_regex.match(message):
                 logging.debug(f"Received routing table from {sender_ip}: {message}")
                 for entry in table_regex.findall(message):
