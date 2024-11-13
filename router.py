@@ -152,18 +152,18 @@ class Router:
         if the new metric is lower than or equal to the current one.
         This is NOT thread-safe on the access to the routing table and, thus, it should be handled by the caller!
         Args:
-            sender_ip (str): The IP address of the sender of the routing table.
+            out_ip (str): The IP address of the sender of the routing table, which is the node to which messages to the provided route need to be forwarded.
             entry (str): The entry to be added or updated in the routing table. It should be in the format '192.168.10.1:1'.
         """
         logging.debug(f"Updating (or not) routing table with entry: {entry}")
 
-        if out_ip == self.my_ip:
-            logging.debug("Ignoring route to myself")
-            return
-
         data: List[str] = entry.split(":")
         route_ip: str = data[0]
         metric: int = int(data[1])
+
+        if route_ip == self.my_ip:
+            logging.debug("Ignoring route to myself")
+            return
 
         if route_ip not in self.table:
             logging.debug("Adding new entry to routing table")
