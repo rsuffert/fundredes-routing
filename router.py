@@ -159,7 +159,7 @@ class Router:
 
         data: List[str] = entry.split(":")
         route_ip: str = data[0]
-        metric: int = int(data[1])
+        metric: int = int(data[1]) + 1 # increment the metric because for me the route is one hop away
 
         if route_ip == self.my_ip: # TODO: should we discard the route in this situation?
             logging.debug("Ignoring route to myself")
