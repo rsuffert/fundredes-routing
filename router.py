@@ -219,7 +219,7 @@ class Router:
         logging.debug(f"Forwarding message from {sender_ip} to {dest_ip}")
         next_hop: str = self.table[dest_ip].out_address
         with self.sock_mutex:
-            self.sock.sendto(text.encode(), (next_hop, PORT))
+            self.sock.sendto(f"&{sender_ip}%{dest_ip}%{text}".encode(), (next_hop, PORT))
 
     def _remove_stale_routes(self) -> None:
         """
