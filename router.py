@@ -226,15 +226,20 @@ class Router:
         Removes stale routes from the router's routing table.
         """
         with self.table_mutex:
-            # we need to use a list here because we are modifying the dictionary while iterating over it
-            # and that is not allowed in Python (would result in a RuntimeError)
-            stale_routes = [
-                dest_ip for dest_ip, path in self.table.items()
-                if time.time() - path.timestamp > STALE_ROUTE_THRESHOLD
+            # stale IPs (routes with these as route or out IP need to be removed)
+            current_time = time.time()
+            stale_ips = [
+                ip for ip, path in self.table.items()
+                if current_time - path.timestamp > STALE_ROUTE_THRESHOLD
             ]
-            for dest_ip in stale_routes:
-                logging.debug(f"Removing stale route to {dest_ip}")
-                del self.table[dest_ip]
+            logging.debug(f"Stale IPs: {stale_ips}")
+
+            # remove stale routes from the routing table
+            for route_ip, path in list(zip(self.table.keys(), self.table.values())):
+                if route_ip in stale_ips or path.out_address in stale_ips:
+                    logging.debug(f"Removing stale route to {route_ip} (out IP: {path.out_address})")
+                    del self.table[route_ip]
+            
 
     def _handle_outgoing_message(self) -> None:
         """
