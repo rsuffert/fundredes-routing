@@ -206,18 +206,17 @@ class Router:
         """
         if dest_ip == self.my_ip:
             # Message is for me
-            logging.info(f"Message from {sender_ip}: '{text}'")
+            logging.info(f"Received message from {sender_ip} to me: '{text}'")
             return
         
-        # Message is not for me - is it in the routing table?
         if dest_ip not in self.table:
-            # No route to the destination
-            logging.error(f"No route to {dest_ip}")
+            # Message is not for me and destination is unreachable - discard message
+            logging.error(f"Received message from {sender_ip} to {dest_ip}, but the destination is unreachable because there's no route to it. Discarding...")
             return
         
-        # Message is not for me - forward it
-        logging.debug(f"Forwarding message from {sender_ip} to {dest_ip}")
+        # Message is not for me, but destination is reachable - forward it
         next_hop: str = self.table[dest_ip].out_address
+        logging.info(f"Received message from {sender_ip} to {dest_ip} (forwarding to {next_hop}): '{text}'")
         with self.sock_mutex:
             self.sock.sendto(f"&{sender_ip}%{dest_ip}%{text}".encode(), (next_hop, PORT))
 
